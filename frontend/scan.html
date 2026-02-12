@@ -309,34 +309,7 @@
                 </button>
             </div>
         </div>
-    </div>erificar sesión al cargar
-        window.addEventListener('DOMContentLoaded', verificarSesion);
-
-        async function verificarSesion() {
-            try {
-                const response = await fetch('../backend/verificar_sesion.php');
-                const data = await response.json();
-
-                if (!data.logueado) {
-                    alert('Sesión expirada. Por favor inicia sesión nuevamente.');
-                    window.location.href = '../login.php';
-                    return;
-                }
-
-                // Mostrar nombre de usuario
-                document.getElementById('userName').textContent = data.usuario.nombre || data.usuario.username;
-            } catch (error) {
-                console.error('Error verificando sesión:', error);
-            }
-        }
-
-        function logout() {
-            if (confirm('¿Cerrar sesión?')) {
-                window.location.href = '../backend/logout.php';
-            }
-        }
-
-        // V
+    </div>
 
     <!-- Librería html5-qrcode -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -349,11 +322,17 @@
         let lastScannedToken = '';
         let lastScanTime = 0;
 
-        // Configuración del backend
-        const API_URL = '../backend/validar_qr.php';
+        const STORAGE_KEY = 'qrTickets';
 
         // Inicializar escáner al cargar la página
-        document.addEventListener('DOMContentLoaded', iniciarEscaner);
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('userName').textContent = 'Demo';
+            iniciarEscaner();
+        });
+
+        function logout() {
+            window.location.href = '../index.html';
+        }
 
         /**
          * Inicializar el escáner QR
@@ -438,29 +417,45 @@
         /**
          * Validar token contra el backend
          */
-        async function validarToken(token) {
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ token: token })
-                });
+        function validarToken(token) {
+            const data = validarTokenLocal(token);
 
-                const data = await response.json();
+            // Ocultar loading
+            document.getElementById('loading').classList.remove('active');
 
-                // Ocultar loading
-                document.getElementById('loading').classList.remove('active');
+            // Mostrar resultado
+            mostrarResultado(data);
+        }
 
-                // Mostrar resultado
-                mostrarResultado(data);
+        function getTickets() {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        }
 
-            } catch (error) {
-                document.getElementById('loading').classList.remove('active');
-                mostrarError('Error de conexión: ' + error.message);
-                isProcessing = false;
+        function setTickets(tickets) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
+        }
+
+        function validarTokenLocal(token) {
+            const tickets = getTickets();
+            const found = tickets.find((t) => t.token === token);
+
+            if (!found) {
+                return { success: false, codigo: 'INVALIDO' };
             }
+
+            if (found.estado === 'USADO') {
+                return { success: false, codigo: 'YA_USADO', folio: found.folio };
+            }
+
+            found.estado = 'USADO';
+            setTickets(tickets);
+
+            return {
+                success: true,
+                codigo: 'VALIDO',
+                folio: found.folio,
+                tipo: found.tipo
+            };
         }
 
         /**

@@ -235,21 +235,7 @@
         .alert.error {
             background: #f8d7da;
             color: #721c24;
-            bordtopbar">
-        <div class="user-info">
-            <div style="font-size: 32px;">👤</div>
-            <div>
-                <strong id="userName">Administrador</strong><br>
-                <small>Generador de Boletos</small>
-            </div>
-        </div>
-        <div>
-            <a href="../dashboard.php" class="btn-back">🏠 Dashboard</a>
-            <button class="btn-logout" onclick="logout()">🚪 Cerrar Sesión</button>
-        </div>
-    </div>
-
-    <div class="er: 1px solid #f5c6cb;
+            border: 1px solid #f5c6cb;
         }
 
         .alert.active {
@@ -284,6 +270,19 @@
     </style>
 </head>
 <body>
+    <div class="topbar">
+        <div class="user-info">
+            <div style="font-size: 32px;">👤</div>
+            <div>
+                <strong id="userName">Demo</strong><br>
+                <small>Generador de Boletos</small>
+            </div>
+        </div>
+        <div>
+            <a href="../index.html" class="btn-back">🏠 Inicio</a>
+            <a href="../frontend/scan.html" class="btn-back">📷 Escáner</a>
+        </div>
+    </div>
     <div class="container">
         <h1>🎫 Generador de Boletos</h1>
         <p class="subtitle">Sistema de validación con código QR</p>
@@ -347,7 +346,7 @@
                 </button>
             </div>
             <p style="color: #856404; font-size: 12px; margin-top: 10px;">
-                Estas acciones requieren contraseña y son irreversibles
+                Estas acciones son locales (demo) e irreversibles
             </p>
         </div>
 
@@ -355,34 +354,6 @@
         <div class="qr-preview" id="qrPreview">
             <h3>✅ Boleto Generado Exitosamente</h3>
             <img id="qrImage" src="" alt="Código QR">
-           Verificar sesión de administrador
-        window.addEventListener('DOMContentLoaded', verificarSesionAdmin);
-
-        async function verificarSesionAdmin() {
-            try {
-                const response = await fetch('../backend/verificar_sesion.php');
-                const data = await response.json();
-
-                if (!data.logueado || data.usuario.rol !== 'admin') {
-                    alert('Acceso denegado. Solo administradores.');
-                    window.location.href = '../login.php';
-                    return;
-                }
-
-                document.getElementById('userName').textContent = data.usuario.nombre;
-            } catch (error) {
-                console.error('Error verificando sesión:', error);
-                window.location.href = '../login.php';
-            }
-        }
-
-        function logout() {
-            if (confirm('¿Cerrar sesión?')) {
-                window.location.href = '../backend/logout.php';
-            }
-        }
-
-        //  
             <div class="boleto-info">
                 <p><strong>Folio:</strong> <span id="boletoFolio"></span></p>
                 <p><strong>Token:</strong> <span id="boletoToken"></span></p>
@@ -396,15 +367,19 @@
     </div>
 
     <script>
-        // Cargar estadísticas al iniciar
-        cargarEstadisticas();
+        const STORAGE_KEY = 'qrTickets';
+        const COUNTER_KEY = 'qrFolioCounter';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarEstadisticas();
+        });
 
         // Manejar envío del formulario
-        document.getElementById('formGenerar').addEventListener('submit', async (e) => {
+        document.getElementById('formGenerar').addEventListener('submit', (e) => {
             e.preventDefault();
-            
+
             const tipo = document.getElementById('tipo').value;
-            const cantidad = parseInt(document.getElementById('cantidad').value);
+            const cantidad = parseInt(document.getElementById('cantidad').value, 10);
             const prefijo = document.getElementById('prefijo').value || (tipo === 'VIP' ? 'VIP' : 'BOL');
 
             // Ocultar preview anterior
@@ -412,34 +387,57 @@
 
             // Generar boletos
             for (let i = 0; i < cantidad; i++) {
-                await generarBoleto(tipo, prefijo);
+                generarBoleto(tipo, prefijo);
             }
 
             // Recargar estadísticas
             cargarEstadisticas();
         });
 
-        async function generarBoleto(tipo, prefijo) {
-            try {
-                const response = await fetch('../backend/generar_qr.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ tipo, prefijo })
-                });
+        function getTickets() {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        }
 
-                const data = await response.json();
+        function setTickets(tickets) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
+        }
 
-                if (data.success) {
-                    mostrarAlerta('Boleto generado exitosamente', 'success');
-                    mostrarPreview(data.boleto);
-                } else {
-                    mostrarAlerta('Error: ' + data.error, 'error');
-                }
-            } catch (error) {
-                mostrarAlerta('Error de conexión: ' + error.message, 'error');
+        function nextFolio(prefijo) {
+            const current = parseInt(localStorage.getItem(COUNTER_KEY) || '0', 10) + 1;
+            localStorage.setItem(COUNTER_KEY, String(current));
+            return `${prefijo}-${String(current).padStart(3, '0')}`;
+        }
+
+        function crearToken() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let token = '';
+            for (let i = 0; i < 16; i++) {
+                token += chars.charAt(Math.floor(Math.random() * chars.length));
             }
+            return token;
+        }
+
+        function generarBoleto(tipo, prefijo) {
+            const token = crearToken();
+            const folio = nextFolio(prefijo);
+            const fecha = new Date();
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(token)}`;
+
+            const boleto = {
+                token,
+                folio,
+                tipo,
+                estado: 'NO_USADO',
+                fecha_creacion: fecha.toISOString(),
+                qr_url: qrUrl
+            };
+
+            const tickets = getTickets();
+            tickets.push(boleto);
+            setTickets(tickets);
+
+            mostrarAlerta('Boleto generado exitosamente', 'success');
+            mostrarPreview(boleto);
         }
 
         function mostrarPreview(boleto) {
@@ -448,14 +446,14 @@
             document.getElementById('boletoToken').textContent = boleto.token;
             document.getElementById('boletoTipo').textContent = boleto.tipo;
             document.getElementById('boletoFecha').textContent = new Date(boleto.fecha_creacion).toLocaleString('es-MX');
-            
+
             document.getElementById('qrPreview').classList.add('active');
         }
 
         function descargarQR() {
             const img = document.getElementById('qrImage');
             const folio = document.getElementById('boletoFolio').textContent;
-            
+
             const link = document.createElement('a');
             link.href = img.src;
             link.download = `boleto_${folio}.jpg`;
@@ -463,114 +461,50 @@
         }
 
         // =============================================
-        // FUNCIONES DE RESETEO (PROTEGIDAS)
+        // FUNCIONES DE RESETEO (LOCALES)
         // =============================================
 
-        async function resetearUsados() {
-            // Confirmación doble
+        function resetearUsados() {
             if (!confirm('⚠️ ¿Estás seguro de resetear todos los boletos USADOS a NO USADOS?\n\nEsto permitirá que se vuelvan a escanear.')) {
                 return;
             }
 
-            // Pedir contraseña
-            const password = prompt('🔐 Ingresa la contraseña de administrador:');
-            
-            if (!password) {
-                mostrarAlerta('Acción cancelada', 'error');
-                return;
-            }
+            const tickets = getTickets().map((ticket) => ({
+                ...ticket,
+                estado: 'NO_USADO'
+            }));
 
-            try {
-                const response = await fetch('../backend/resetear.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        password: password,
-                        accion: 'reset_usados'
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    mostrarAlerta(`✅ ${data.mensaje} (${data.boletos_reseteados} boletos)`, 'success');
-                    cargarEstadisticas();
-                } else {
-                    mostrarAlerta('❌ ' + data.error, 'error');
-                }
-            } catch (error) {
-                mostrarAlerta('Error de conexión: ' + error.message, 'error');
-            }
+            setTickets(tickets);
+            mostrarAlerta('✅ Boletos reseteados correctamente', 'success');
+            cargarEstadisticas();
         }
 
-        async function eliminarTodo() {
-            // Confirmación triple (es peligroso)
+        function eliminarTodo() {
             if (!confirm('🚨 ¡PELIGRO! ¿Estás COMPLETAMENTE SEGURO de eliminar TODOS los boletos?\n\nEsta acción NO se puede deshacer.')) {
                 return;
             }
 
-            if (!confirm('⚠️ Última advertencia: Se eliminarán TODOS los boletos de la base de datos.\n\n¿Continuar?')) {
+            if (!confirm('⚠️ Última advertencia: Se eliminarán TODOS los boletos locales.\n\n¿Continuar?')) {
                 return;
             }
 
-            // Pedir contraseña
-            const password = prompt('🔐 Ingresa la contraseña de administrador:');
-            
-            if (!password) {
-                mostrarAlerta('Acción cancelada', 'error');
-                return;
-            }
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(COUNTER_KEY);
 
-            try {
-                const response = await fetch('../backend/resetear.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        password: password,
-                        accion: 'eliminar_todo'
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    mostrarAlerta(`✅ ${data.mensaje} (${data.boletos_eliminados} boletos)`, 'success');
-                    cargarEstadisticas();
-                } else {
-                    mostrarAlerta('❌ ' + data.error, 'error');
-                }
-            } catch (error) {
-                mostrarAlerta('Error de conexión: ' + error.message, 'error');
-            }
+            document.getElementById('qrPreview').classList.remove('active');
+            mostrarAlerta('✅ Boletos eliminados', 'success');
+            cargarEstadisticas();
         }
 
-        function descargarQR() {
-            const img = document.getElementById('qrImage');
-            const folio = document.getElementById('boletoFolio').textContent;
-            
-            const link = document.createElement('a');
-            link.href = img.src;
-            link.download = `boleto_${folio}.jpg`;
-            link.click();
-        }
+        function cargarEstadisticas() {
+            const tickets = getTickets();
+            const total = tickets.length;
+            const usados = tickets.filter((t) => t.estado === 'USADO').length;
+            const disponibles = total - usados;
 
-        async function cargarEstadisticas() {
-            try {
-                const response = await fetch('../backend/estadisticas.php');
-                const data = await response.json();
-
-                if (data.success) {
-                    document.getElementById('stat-total').textContent = data.stats.total;
-                    document.getElementById('stat-disponibles').textContent = data.stats.disponibles;
-                    document.getElementById('stat-usados').textContent = data.stats.usados;
-                }
-            } catch (error) {
-                console.error('Error cargando estadísticas:', error);
-            }
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-disponibles').textContent = disponibles;
+            document.getElementById('stat-usados').textContent = usados;
         }
 
         function mostrarAlerta(mensaje, tipo) {
