@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escáner QR - Validación de Boletos</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: white;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .user-badge {
+            background: rgba(0,0,0,0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-logout {
+            padding: 8px 15px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Vista del escáner */
+        .scanner-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background: #0a0a0a;
+        }
+
+        #reader {
+            width: 100%;
+            max-width: 500px;
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        /* Resultado de validación */
+        .result-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: fadeIn 0.3s;
+        }
+
+        .result-overlay.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .result-content {
+            text-align: center;
+            padding: 40px;
+            animation: scaleIn 0.3s;
+        }
+
+        @keyframes scaleIn {
+            from { transform: scale(0.8); }
+            to { transform: scale(1); }
+        }
+
+        .result-icon {
+            font-size: 120px;
+            margin-bottom: 20px;
+            animation: pulse 0.5s;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .result-text {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .result-info {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-top: 10px;
+        }
+
+        /* Colores según resultado */
+        .result-overlay.valido {
+            background: rgba(76, 175, 80, 0.98);
+        }
+
+        .result-overlay.usado {
+            background: rgba(244, 67, 54, 0.98);
+        }
+
+        .result-overlay.invalido {
+            background: rgba(244, 67, 54, 0.98);
+        }
+
+        /* Botones */
+        .btn-continuar {
+            margin-top: 30px;
+            padding: 15px 40px;
+            background: white;
+            color: #333;
+            border: none;
+            border-radius: 25px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        /* Estado de escaneo */
+        .scan-status {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        /* Contador */
+        .counter {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            min-width: 100px;
+        }
+
+        .counter-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .counter-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        /* Loading */
+        .loading {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top: 5px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Error */
+        .error-message {
+            display: none;
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #f44336;
+            padding: 15px 20px;
+            border-radius: 10px;
+            max-width: 90%;
+            z-index: 999;
+        }
+
+        .error-message.active {
+            display: block;
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes slideDown {
+            from { transform: translate(-50%, -100%); }
+            to { transform: translate(-50%, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <h1>🎫 Escáner de Boletos</h1>
+                <div class="user-badge" id="userBadge">
+                    <span>👤</span>
+                    <span id="userName">Usuario</span>
+                </div>
+            </div>
+            <button class="btn-logout" onclick="logout()">🚪 Salir</button>
+        </div>
+
+        <!-- Contador de validaciones -->
+        <div class="counter">
+            <div class="counter-number" id="validCount">0</div>
+            <div class="counter-label">Validados</div>
+        </div>
+
+        <!-- Vista del escáner -->
+        <div class="scanner-view">
+            <div id="reader"></div>
+            
+            <div class="scan-status">
+                <span id="scanStatus">📷 Listo para escanear</span>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+
+        <!-- Mensaje de error -->
+        <div class="error-message" id="errorMessage"></div>
+
+        <!-- Overlay de resultado -->
+        <div class="result-overlay" id="resultOverlay">
+            <div class="result-content">
+                <div class="result-icon" id="resultIcon"></div>
+                <div class="result-text" id="resultText"></div>
+                <div class="result-info" id="resultInfo"></div>
+                <button class="btn-continuar" onclick="continuarEscaneando()">
+                    Continuar Escaneando
+                </button>
+            </div>
+        </div>
+    </div>erificar sesión al cargar
+        window.addEventListener('DOMContentLoaded', verificarSesion);
+
+        async function verificarSesion() {
+            try {
+                const response = await fetch('../backend/verificar_sesion.php');
+                const data = await response.json();
+
+                if (!data.logueado) {
+                    alert('Sesión expirada. Por favor inicia sesión nuevamente.');
+                    window.location.href = '../login.php';
+                    return;
+                }
+
+                // Mostrar nombre de usuario
+                document.getElementById('userName').textContent = data.usuario.nombre || data.usuario.username;
+            } catch (error) {
+                console.error('Error verificando sesión:', error);
+            }
+        }
+
+        function logout() {
+            if (confirm('¿Cerrar sesión?')) {
+                window.location.href = '../backend/logout.php';
+            }
+        }
+
+        // V
+
+    <!-- Librería html5-qrcode -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    
+    <script>
+        // Variables globales
+        let html5QrCode;
+        let isProcessing = false;
+        let validCount = 0;
+        let lastScannedToken = '';
+        let lastScanTime = 0;
+
+        // Configuración del backend
+        const API_URL = '../backend/validar_qr.php';
+
+        // Inicializar escáner al cargar la página
+        document.addEventListener('DOMContentLoaded', iniciarEscaner);
+
+        /**
+         * Inicializar el escáner QR
+         */
+        function iniciarEscaner() {
+            html5QrCode = new Html5Qrcode("reader");
+
+            const config = {
+                fps: 10,    // Cuadros por segundo
+                qrbox: {
+                    width: 250,
+                    height: 250
+                },
+                aspectRatio: 1.0
+            };
+
+            // Intentar usar la cámara trasera en móviles
+            Html5Qrcode.getCameras().then(cameras => {
+                if (cameras && cameras.length) {
+                    // Buscar cámara trasera (environment)
+                    let cameraId = cameras[0].id;
+                    
+                    for (let camera of cameras) {
+                        if (camera.label.toLowerCase().includes('back') || 
+                            camera.label.toLowerCase().includes('rear') ||
+                            camera.label.toLowerCase().includes('environment')) {
+                            cameraId = camera.id;
+                            break;
+                        }
+                    }
+
+                    // Iniciar escáner
+                    html5QrCode.start(
+                        cameraId,
+                        config,
+                        onScanSuccess,
+                        onScanFailure
+                    ).catch(err => {
+                        mostrarError('Error al iniciar cámara: ' + err);
+                    });
+                }
+            }).catch(err => {
+                mostrarError('No se encontró ninguna cámara disponible');
+            });
+        }
+
+        /**
+         * Callback cuando se escanea un QR exitosamente
+         */
+        function onScanSuccess(decodedText, decodedResult) {
+            // Evitar procesar el mismo QR múltiples veces
+            const now = Date.now();
+            if (isProcessing || 
+                (decodedText === lastScannedToken && now - lastScanTime < 3000)) {
+                return;
+            }
+
+            isProcessing = true;
+            lastScannedToken = decodedText;
+            lastScanTime = now;
+
+            // Vibrar si está disponible
+            if (navigator.vibrate) {
+                navigator.vibrate(100);
+            }
+
+            // Mostrar loading
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('scanStatus').textContent = '⏳ Validando...';
+
+            // Validar el token
+            validarToken(decodedText);
+        }
+
+        /**
+         * Callback cuando falla el escaneo
+         */
+        function onScanFailure(error) {
+            // No hacer nada, es normal que falle hasta que enfoque un QR
+        }
+
+        /**
+         * Validar token contra el backend
+         */
+        async function validarToken(token) {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token: token })
+                });
+
+                const data = await response.json();
+
+                // Ocultar loading
+                document.getElementById('loading').classList.remove('active');
+
+                // Mostrar resultado
+                mostrarResultado(data);
+
+            } catch (error) {
+                document.getElementById('loading').classList.remove('active');
+                mostrarError('Error de conexión: ' + error.message);
+                isProcessing = false;
+            }
+        }
+
+        /**
+         * Mostrar resultado de la validación
+         */
+        function mostrarResultado(data) {
+            const overlay = document.getElementById('resultOverlay');
+            const icon = document.getElementById('resultIcon');
+            const text = document.getElementById('resultText');
+            const info = document.getElementById('resultInfo');
+
+            // Determinar el tipo de resultado
+            let tipo = 'invalido';
+            
+            if (data.success && data.codigo === 'VALIDO') {
+                tipo = 'valido';
+                icon.textContent = '✅';
+                text.textContent = 'VÁLIDO';
+                info.textContent = `Folio: ${data.folio} | Tipo: ${data.tipo}`;
+                
+                // Incrementar contador
+                validCount++;
+                document.getElementById('validCount').textContent = validCount;
+                
+                // Sonido de éxito (si está disponible)
+                playSound('success');
+                
+            } else if (data.codigo === 'YA_USADO') {
+                tipo = 'usado';
+                icon.textContent = '⛔';
+                text.textContent = 'YA USADO';
+                info.textContent = data.folio ? `Folio: ${data.folio}` : 'Este boleto ya fue escaneado';
+                
+                // Sonido de error
+                playSound('error');
+                
+            } else {
+                tipo = 'invalido';
+                icon.textContent = '❌';
+                text.textContent = 'INVÁLIDO';
+                info.textContent = 'Boleto no encontrado en el sistema';
+                
+                // Sonido de error
+                playSound('error');
+            }
+
+            // Aplicar clase de color
+            overlay.className = `result-overlay ${tipo} active`;
+
+            // Vibración según resultado
+            if (navigator.vibrate) {
+                if (tipo === 'valido') {
+                    navigator.vibrate([100, 50, 100]);  // Patrón de éxito
+                } else {
+                    navigator.vibrate([200, 100, 200, 100, 200]);  // Patrón de error
+                }
+            }
+
+            // Auto-cerrar después de 3 segundos (opcional)
+            // setTimeout(continuarEscaneando, 3000);
+        }
+
+        /**
+         * Continuar escaneando
+         */
+        function continuarEscaneando() {
+            document.getElementById('resultOverlay').classList.remove('active');
+            document.getElementById('scanStatus').textContent = '📷 Listo para escanear';
+            isProcessing = false;
+            lastScannedToken = '';
+        }
+
+        /**
+         * Mostrar mensaje de error
+         */
+        function mostrarError(mensaje) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = mensaje;
+            errorDiv.classList.add('active');
+
+            setTimeout(() => {
+                errorDiv.classList.remove('active');
+            }, 5000);
+        }
+
+        /**
+         * Reproducir sonido (opcional)
+         */
+        function playSound(type) {
+            // Usar Web Audio API para generar sonidos simples
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            if (type === 'success') {
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+            } else {
+                oscillator.frequency.value = 200;
+                oscillator.type = 'square';
+            }
+
+            gainNode.gain.value = 0.3;
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+
+        // Prevenir que la pantalla se apague
+        if ('wakeLock' in navigator) {
+            let wakeLock = null;
+            
+            const requestWakeLock = async () => {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                } catch (err) {
+                    console.log('Wake Lock error:', err);
+                }
+            };
+            
+            requestWakeLock();
+        }
+    </script>
+</body>
+</html>

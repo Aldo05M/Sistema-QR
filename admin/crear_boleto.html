@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generar Boletos - Sistema QR</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .topbar {
+            background: rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+            padding: 15px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .btn-logout, .btn-back {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            margin-left: 10px;
+        }
+
+        .btn-logout:hover, .btn-back:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .qr-preview {
+            display: none;
+            margin-top: 30px;
+            padding: 30px;
+            background: #f9f9f9;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .qr-preview.active {
+            display: block;
+        }
+
+        .qr-preview img {
+            max-width: 300px;
+            margin: 20px auto;
+            border: 5px solid white;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .boleto-info {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .boleto-info p {
+            margin: 10px 0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .boleto-info strong {
+            color: #333;
+            font-size: 16px;
+        }
+
+        .btn-download {
+            margin-top: 20px;
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-download:hover {
+            background: #45a049;
+        }
+
+        .btn-warning {
+            background: #ff9800;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-warning:hover {
+            background: #f57c00;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-danger:hover {
+            background: #d32f2f;
+            transform: translateY(-2px);
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            bordtopbar">
+        <div class="user-info">
+            <div style="font-size: 32px;">👤</div>
+            <div>
+                <strong id="userName">Administrador</strong><br>
+                <small>Generador de Boletos</small>
+            </div>
+        </div>
+        <div>
+            <a href="../dashboard.php" class="btn-back">🏠 Dashboard</a>
+            <button class="btn-logout" onclick="logout()">🚪 Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <div class="er: 1px solid #f5c6cb;
+        }
+
+        .alert.active {
+            display: block;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-card .number {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎫 Generador de Boletos</h1>
+        <p class="subtitle">Sistema de validación con código QR</p>
+
+        <!-- Estadísticas -->
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="number" id="stat-total">0</div>
+                <div class="label">Total Generados</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="stat-disponibles">0</div>
+                <div class="label">Disponibles</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="stat-usados">0</div>
+                <div class="label">Usados</div>
+            </div>
+        </div>
+
+        <!-- Alertas -->
+        <div class="alert" id="alert">
+            <span id="alert-message"></span>
+        </div>
+
+        <!-- Formulario -->
+        <form id="formGenerar">
+            <div class="form-group">
+                <label for="tipo">Tipo de Boleto</label>
+                <select id="tipo" name="tipo" required>
+                    <option value="GENERAL">🎫 General</option>
+                    <option value="VIP">👑 VIP</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="cantidad">Cantidad a Generar</label>
+                <input type="number" id="cantidad" name="cantidad" min="1" max="100" value="1" required>
+            </div>
+
+            <div class="form-group">
+                <label for="prefijo">Prefijo del Folio (opcional)</label>
+                <input type="text" id="prefijo" name="prefijo" placeholder="Ej: BOL, VIP, DISCO" maxlength="10">
+            </div>
+
+            <div class="btn-group">
+                <button type="submit" class="btn-primary">✨ Generar Boletos</button>
+                <button type="button" class="btn-secondary" onclick="location.reload()">🔄 Limpiar</button>
+            </div>
+        </form>
+
+        <!-- Zona de peligro -->
+        <div style="margin-top: 40px; padding: 20px; background: #fff3cd; border-radius: 10px; border-left: 4px solid #ffc107;">
+            <h3 style="color: #856404; margin-bottom: 15px;">⚠️ Zona de Administración</h3>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button type="button" class="btn-warning" onclick="resetearUsados()">
+                    🔄 Resetear Boletos Usados
+                </button>
+                <button type="button" class="btn-danger" onclick="eliminarTodo()">
+                    🗑️ Eliminar TODOS los Boletos
+                </button>
+            </div>
+            <p style="color: #856404; font-size: 12px; margin-top: 10px;">
+                Estas acciones requieren contraseña y son irreversibles
+            </p>
+        </div>
+
+        <!-- Preview del QR -->
+        <div class="qr-preview" id="qrPreview">
+            <h3>✅ Boleto Generado Exitosamente</h3>
+            <img id="qrImage" src="" alt="Código QR">
+           Verificar sesión de administrador
+        window.addEventListener('DOMContentLoaded', verificarSesionAdmin);
+
+        async function verificarSesionAdmin() {
+            try {
+                const response = await fetch('../backend/verificar_sesion.php');
+                const data = await response.json();
+
+                if (!data.logueado || data.usuario.rol !== 'admin') {
+                    alert('Acceso denegado. Solo administradores.');
+                    window.location.href = '../login.php';
+                    return;
+                }
+
+                document.getElementById('userName').textContent = data.usuario.nombre;
+            } catch (error) {
+                console.error('Error verificando sesión:', error);
+                window.location.href = '../login.php';
+            }
+        }
+
+        function logout() {
+            if (confirm('¿Cerrar sesión?')) {
+                window.location.href = '../backend/logout.php';
+            }
+        }
+
+        //  
+            <div class="boleto-info">
+                <p><strong>Folio:</strong> <span id="boletoFolio"></span></p>
+                <p><strong>Token:</strong> <span id="boletoToken"></span></p>
+                <p><strong>Tipo:</strong> <span id="boletoTipo"></span></p>
+                <p><strong>Estado:</strong> <span id="boletoEstado">NO USADO</span></p>
+                <p><strong>Fecha:</strong> <span id="boletoFecha"></span></p>
+            </div>
+
+            <button class="btn-download" onclick="descargarQR()">📥 Descargar QR</button>
+        </div>
+    </div>
+
+    <script>
+        // Cargar estadísticas al iniciar
+        cargarEstadisticas();
+
+        // Manejar envío del formulario
+        document.getElementById('formGenerar').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const tipo = document.getElementById('tipo').value;
+            const cantidad = parseInt(document.getElementById('cantidad').value);
+            const prefijo = document.getElementById('prefijo').value || (tipo === 'VIP' ? 'VIP' : 'BOL');
+
+            // Ocultar preview anterior
+            document.getElementById('qrPreview').classList.remove('active');
+
+            // Generar boletos
+            for (let i = 0; i < cantidad; i++) {
+                await generarBoleto(tipo, prefijo);
+            }
+
+            // Recargar estadísticas
+            cargarEstadisticas();
+        });
+
+        async function generarBoleto(tipo, prefijo) {
+            try {
+                const response = await fetch('../backend/generar_qr.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ tipo, prefijo })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    mostrarAlerta('Boleto generado exitosamente', 'success');
+                    mostrarPreview(data.boleto);
+                } else {
+                    mostrarAlerta('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                mostrarAlerta('Error de conexión: ' + error.message, 'error');
+            }
+        }
+
+        function mostrarPreview(boleto) {
+            document.getElementById('qrImage').src = boleto.qr_url;
+            document.getElementById('boletoFolio').textContent = boleto.folio;
+            document.getElementById('boletoToken').textContent = boleto.token;
+            document.getElementById('boletoTipo').textContent = boleto.tipo;
+            document.getElementById('boletoFecha').textContent = new Date(boleto.fecha_creacion).toLocaleString('es-MX');
+            
+            document.getElementById('qrPreview').classList.add('active');
+        }
+
+        function descargarQR() {
+            const img = document.getElementById('qrImage');
+            const folio = document.getElementById('boletoFolio').textContent;
+            
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = `boleto_${folio}.jpg`;
+            link.click();
+        }
+
+        // =============================================
+        // FUNCIONES DE RESETEO (PROTEGIDAS)
+        // =============================================
+
+        async function resetearUsados() {
+            // Confirmación doble
+            if (!confirm('⚠️ ¿Estás seguro de resetear todos los boletos USADOS a NO USADOS?\n\nEsto permitirá que se vuelvan a escanear.')) {
+                return;
+            }
+
+            // Pedir contraseña
+            const password = prompt('🔐 Ingresa la contraseña de administrador:');
+            
+            if (!password) {
+                mostrarAlerta('Acción cancelada', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('../backend/resetear.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        password: password,
+                        accion: 'reset_usados'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    mostrarAlerta(`✅ ${data.mensaje} (${data.boletos_reseteados} boletos)`, 'success');
+                    cargarEstadisticas();
+                } else {
+                    mostrarAlerta('❌ ' + data.error, 'error');
+                }
+            } catch (error) {
+                mostrarAlerta('Error de conexión: ' + error.message, 'error');
+            }
+        }
+
+        async function eliminarTodo() {
+            // Confirmación triple (es peligroso)
+            if (!confirm('🚨 ¡PELIGRO! ¿Estás COMPLETAMENTE SEGURO de eliminar TODOS los boletos?\n\nEsta acción NO se puede deshacer.')) {
+                return;
+            }
+
+            if (!confirm('⚠️ Última advertencia: Se eliminarán TODOS los boletos de la base de datos.\n\n¿Continuar?')) {
+                return;
+            }
+
+            // Pedir contraseña
+            const password = prompt('🔐 Ingresa la contraseña de administrador:');
+            
+            if (!password) {
+                mostrarAlerta('Acción cancelada', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('../backend/resetear.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        password: password,
+                        accion: 'eliminar_todo'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    mostrarAlerta(`✅ ${data.mensaje} (${data.boletos_eliminados} boletos)`, 'success');
+                    cargarEstadisticas();
+                } else {
+                    mostrarAlerta('❌ ' + data.error, 'error');
+                }
+            } catch (error) {
+                mostrarAlerta('Error de conexión: ' + error.message, 'error');
+            }
+        }
+
+        function descargarQR() {
+            const img = document.getElementById('qrImage');
+            const folio = document.getElementById('boletoFolio').textContent;
+            
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = `boleto_${folio}.jpg`;
+            link.click();
+        }
+
+        async function cargarEstadisticas() {
+            try {
+                const response = await fetch('../backend/estadisticas.php');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('stat-total').textContent = data.stats.total;
+                    document.getElementById('stat-disponibles').textContent = data.stats.disponibles;
+                    document.getElementById('stat-usados').textContent = data.stats.usados;
+                }
+            } catch (error) {
+                console.error('Error cargando estadísticas:', error);
+            }
+        }
+
+        function mostrarAlerta(mensaje, tipo) {
+            const alert = document.getElementById('alert');
+            const alertMessage = document.getElementById('alert-message');
+            
+            alert.className = `alert ${tipo} active`;
+            alertMessage.textContent = mensaje;
+
+            setTimeout(() => {
+                alert.classList.remove('active');
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

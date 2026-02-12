@@ -1,0 +1,15 @@
+.git
+.gitignore
+*.md
+README.md
+PRUEBAS.md
+INSTALACION.md
+INSTALACION_DIRECTA_CLOUD.md
+DEPLOY_GOOGLE_CLOUD.md
+PROTOCOLO_STAFF.md
+node_modules/
+.vscode/
+.idea/
+*.log
+*.bak
+~*

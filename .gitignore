@@ -1,0 +1,10 @@
+/backend/config.php
+/qr_images/*
+!/qr_images/.gitkeep
+/.vscode/
+*.log
+*.zip
+*.tar.gz
+.DS_Store
+Thumbs.db
+.env

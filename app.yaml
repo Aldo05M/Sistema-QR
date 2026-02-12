@@ -1,0 +1,25 @@
+runtime: php81
+
+handlers:
+  - url: /.*
+    secure: always
+    redirect_http_response_code: 301
+    script: auto
+
+# Conexión a Cloud SQL
+beta_settings:
+  cloud_sql_instances: "sistemas-qr-disco:us-central1:qr-database"
+
+# Variables de entorno (actualizar con tus datos reales)
+env_variables:
+  DB_HOST: "34.122.25.35"  # ⬅️ Cambiar por la IP pública de tu Cloud SQL
+  DB_USER: "root"
+  DB_PASS: "Disco2026!"  # ⬅️ Cambiar por tu contraseña de MySQL
+  DB_NAME: "qr_boletos"
+
+# Configuración de escalamiento (para disco con ~600 personas)
+automatic_scaling:
+  min_instances: 1
+  max_instances: 5
+  target_cpu_utilization: 0.65
+  target_throughput_utilization: 0.6
